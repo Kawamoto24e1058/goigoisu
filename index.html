@@ -274,21 +274,7 @@
 
         .hidden { display: none !important; }
 
-        /* Debug HUD */
-        #debug-log {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            color: #00FF00;
-            font-family: monospace;
-            font-size: 12px;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 8px;
-            border-radius: 4px;
-            pointer-events: none;
-            z-index: 1000;
-            white-space: pre-wrap;
-        }
+
     </style>
 </head>
 <body>
@@ -301,7 +287,7 @@
         <div id="text-element" class="goi-su-text double-stroke"></div>
     </div>
 
-    <div id="debug-log">Waiting for motion...</div>
+
 
     <script>
         const startButton = document.getElementById('start-button');
@@ -311,15 +297,15 @@
         let synth = null;
         let lastTriggerTime = 0;
         const COOLDOWN_MS = 200; // Professional Speed
-        const THRESHOLD = 20;    // Stricter Threshold
-        const RATIO = 2.5;       // Fixing Critical ReferenceError
+        const THRESHOLD = 12;    // V21 Relaxed Threshold for less fatigue
+        const RATIO = 3.5;       // V21 Ultra-Strict Ratio to prevent diagonals
         let wakeLock = null;
 
         // Combo Counters
         let goiCount = 0;
         let sueCount = 0;
         
-        const debugLog = document.getElementById('debug-log');
+
         
         // Ultimate Finish Flag
         let isGogoiActive = false;
@@ -483,18 +469,21 @@
             const absY = Math.abs(y);
             const now = Date.now();
 
-            // Update Debug HUD
-            debugLog.textContent = `X: ${x.toFixed(1)} | Y: ${y.toFixed(1)}\nGoi Combo: ${goiCount} | Su Combo: ${sueCount}\nUltimate Armed: ${isGogoiActive}`;
+
 
             if (now - lastTriggerTime < COOLDOWN_MS) return;
 
-            // Strict V20 Physics: 3.0x Dominance + High Thresholds
-            // Y-Axis: Minimum 25G (Chop motion)
-            // X-Axis: Minimum 20G (Swing motion)
-            if (absY > absX * 3.0 && absY > 25) {
+            // Strict V21 Physics: 3.5x Dominance + Relaxed 12G Threshold
+            // Added Z-Axis Filter to ignore 'punches' and complex noisy shakes
+            const z = acc.z || 0;
+            const absZ = Math.abs(z);
+            
+            // Y-Axis: Minimum 12G (Chop motion)
+            // X-Axis: Minimum 12G (Swing motion)
+            if (absY > THRESHOLD && absY > absX * RATIO && absY > absZ * 2.0) {
                 showResult('goi');
                 lastTriggerTime = now;
-            } else if (absX > absY * 3.0 && absX > 20) {
+            } else if (absX > THRESHOLD && absX > absY * RATIO && absX > absZ * 2.0) {
                 showResult('su');
                 lastTriggerTime = now;
             }
