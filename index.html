@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ゴイゴイスー App V3</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000000;
+            color: #ffffff;
+            font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #start-container {
+            text-align: center;
+            z-index: 10;
+        }
+
+        #start-button {
+            padding: 25px 60px;
+            font-size: 2rem;
+            font-weight: 900;
+            color: #ffffff;
+            background: linear-gradient(135deg, #ff4d00, #ff0000);
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        #start-button:active {
+            transform: scale(0.95);
+        }
+
+        .guide-text {
+            margin-top: 25px;
+            font-size: 1rem;
+            opacity: 0.7;
+            font-weight: bold;
+        }
+
+        #result-display {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .goi-su-text {
+            font-size: 35vw;
+            font-weight: 900;
+            color: #ffffff;
+            opacity: 0;
+            transform: scale(0.1);
+            pointer-events: none;
+            text-shadow: 0 0 40px rgba(255, 255, 255, 1);
+            white-space: nowrap;
+        }
+
+        @keyframes heavyZoomIn {
+            0% { opacity: 0; transform: scale(4); }
+            15% { opacity: 1; transform: scale(1); text-shadow: 0 0 100px #fff; }
+            100% { opacity: 0; transform: scale(1.1); text-shadow: 0 0 20px #fff; }
+        }
+
+        .animate-zoom {
+            animation: heavyZoomIn 0.8s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+        }
+
+        @keyframes whiteFlash {
+            0% { background-color: #ffffff; }
+            15% { background-color: rgba(255, 255, 255, 0.2); }
+            100% { background-color: #000000; }
+        }
+
+        .flash-white {
+            animation: whiteFlash 0.5s ease-out forwards;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="start-container">
+        <button id="start-button">開始（許可）</button>
+        <p class="guide-text">スマホを前に突き出すと喋ります</p>
+    </div>
+
+    <div id="result-display">
+        <div id="text-element" class="goi-su-text"></div>
+    </div>
+
+    <script>
+        const startButton = document.getElementById('start-button');
+        const startContainer = document.getElementById('start-container');
+        const textElement = document.getElementById('text-element');
+
+        const synth = window.speechSynthesis;
+        let isThrusting = false;
+        let thrustStartTime = 0;
+        let hasTriggered = false;
+        let wakeLock = null;
+
+        function speak(text, pitch, rate) {
+            synth.cancel();
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = 'ja-JP';
+            utter.pitch = pitch;
+            utter.rate = rate;
+            synth.speak(utter);
+        }
+
+        function showResult(type) {
+            const isSu = type === 'su';
+            textElement.textContent = isSu ? 'スー！' : 'ゴイ！';
+            
+            // Trigger Visuals
+            textElement.classList.remove('animate-zoom');
+            document.body.classList.remove('flash-white');
+            void textElement.offsetWidth; // Reflow
+            textElement.classList.add('animate-zoom');
+            document.body.classList.add('flash-white');
+
+            // Trigger Audio with optimized parameters
+            if (isSu) {
+                // Su: High pitch (1.4), slow rate (0.8)
+                speak('スーーー！', 1.4, 0.8);
+            } else {
+                // Goi: Low pitch (0.8), fast rate (1.8)
+                speak('ゴイ！', 0.8, 1.8);
+            }
+        }
+
+        function handleMotion(event) {
+            const acc = event.acceleration;
+            if (!acc) return;
+            const z = acc.z || 0;
+
+            // Z axis < -15 logic
+            if (z < -15) {
+                if (!isThrusting) {
+                    isThrusting = true;
+                    thrustStartTime = Date.now();
+                    hasTriggered = false;
+                } else if (!hasTriggered) {
+                    const duration = Date.now() - thrustStartTime;
+                    if (duration >= 300) {
+                        showResult('su');
+                        hasTriggered = true;
+                    }
+                }
+            } else if (z > -10) {
+                if (isThrusting && !hasTriggered) {
+                    const duration = Date.now() - thrustStartTime;
+                    if (duration <= 250) {
+                        showResult('goi');
+                        hasTriggered = true;
+                    }
+                }
+                
+                // Allow resetting state when acceleration completely subsides (z > -5)
+                if (z > -5) {
+                    isThrusting = false;
+                    hasTriggered = false;
+                }
+            }
+        }
+
+        async function requestPermissions() {
+            // 1. Silent utter to unlock Speech Synthesis
+            const unlockUtter = new SpeechSynthesisUtterance('');
+            synth.speak(unlockUtter);
+
+            // 2. Silent audio context to unlock Audio completely
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') {
+                    await audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                osc.connect(audioCtx.destination);
+                osc.start(0);
+                osc.stop(audioCtx.currentTime + 0.001);
+            } catch (e) {
+                console.warn('AudioContext unlock failed:', e);
+            }
+
+            // 3. Request Wake Lock to prevent screen sleep
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    document.addEventListener('visibilitychange', async () => {
+                        if (wakeLock !== null && document.visibilityState === 'visible') {
+                            wakeLock = await navigator.wakeLock.request('screen');
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('Wake Lock request failed:', e);
+            }
+
+            // 4. Request Motion Permission
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                try {
+                    const state = await DeviceMotionEvent.requestPermission();
+                    if (state === 'granted') {
+                        startApp();
+                    } else {
+                        alert('センサーの許可が必要です');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('エラーが発生しました');
+                }
+            } else {
+                startApp();
+            }
+        }
+
+        function startApp() {
+            startContainer.classList.add('hidden');
+            window.addEventListener('devicemotion', handleMotion);
+        }
+
+        startButton.addEventListener('click', requestPermissions);
+    </script>
+</body>
+</html>
