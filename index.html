@@ -134,7 +134,7 @@
         .color-gogoi { color: #FF5722; } /* Dark Orange for 5 Combo */
         .color-su { color: #00E5FF; font-style: italic; }
         .color-sue-jackpot { color: #FFFFFF; font-style: italic; } /* White text, Gold stroke */
-        .color-weak-su { color: #88888899; } /* Translucent Grey */
+        .color-weak-su { color: #888888; opacity: 0.7; } /* Translucent Grey */
         .color-ultimate { color: #FFD700; font-style: italic; }
 
         .ultimate-text {
@@ -175,12 +175,12 @@
         }
 
         @keyframes fallDown {
-            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(50vh) rotate(20deg); opacity: 0; }
+            0% { transform: translateY(-5vh) rotate(-5deg); opacity: 0.7; }
+            100% { transform: translateY(30vh) rotate(15deg); opacity: 0; }
         }
 
         .animate-weak-su {
-            animation: fallDown 2.0s ease-in forwards;
+            animation: fallDown 2.5s ease-in forwards;
         }
 
         @keyframes jackpotZoom {
@@ -397,9 +397,9 @@
                     textElement.innerHTML = 'ｽｰ...';
                     textElement.classList.remove('double-stroke');
                     textElement.classList.add('animate-weak-su', 'color-weak-su');
-                    textElement.style.fontSize = '5vw';
+                    textElement.style.fontSize = '8vw';
                     
-                    speak('ｽｰ', 0.4, 0.3, 0.5);
+                    speak('ｽｰ', 0.3, 0.3, 0.5);
                     return;
                 }
                 
@@ -488,14 +488,15 @@
 
             if (now - lastTriggerTime < COOLDOWN_MS) return;
 
-            if (absY > THRESHOLD || absX > THRESHOLD) {
-                if (absY > absX * RATIO) {
-                    showResult('goi');
-                    lastTriggerTime = now;
-                } else if (absX > absY * RATIO) {
-                    showResult('su');
-                    lastTriggerTime = now;
-                }
+            // Strict V20 Physics: 3.0x Dominance + High Thresholds
+            // Y-Axis: Minimum 25G (Chop motion)
+            // X-Axis: Minimum 20G (Swing motion)
+            if (absY > absX * 3.0 && absY > 25) {
+                showResult('goi');
+                lastTriggerTime = now;
+            } else if (absX > absY * 3.0 && absX > 20) {
+                showResult('su');
+                lastTriggerTime = now;
             }
         }
 
