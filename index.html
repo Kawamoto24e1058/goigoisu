@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ゴイゴイスー App V3</title>
+    <title>ゴイゴイスー App Final V9</title>
     <style>
         * {
             box-sizing: border-box;
@@ -18,7 +18,7 @@
             height: 100%;
             background-color: #000000;
             color: #ffffff;
-            font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
             overflow: hidden;
             display: flex;
             justify-content: center;
@@ -49,8 +49,8 @@
 
         .guide-text {
             margin-top: 25px;
-            font-size: 1rem;
-            opacity: 0.7;
+            font-size: 1.1rem;
+            opacity: 0.8;
             font-weight: bold;
         }
 
@@ -68,39 +68,41 @@
         }
 
         .goi-su-text {
-            font-size: 35vw;
+            font-family: Impact, 'Arial Black', sans-serif;
+            font-size: 30vw;
             font-weight: 900;
             opacity: 0;
             pointer-events: none;
             white-space: nowrap;
+            letter-spacing: 0.1em;
         }
 
-        /* ---------------- V7 Goi Styles (Slide up fade) ---------------- */
+        /* ---------------- V9 Goi Styles (Graceful FadeOut) ---------------- */
         .color-goi {
             color: #FFFF00;
             text-shadow: 0 5px 15px #000, 0 0 30px #ff4d00;
         }
 
-        @keyframes fadeUpGoi {
+        @keyframes fadeOutGoi {
             0% { opacity: 1; transform: scale(1.5) translateY(0); text-shadow: 0 0 50px #fff; }
-            100% { opacity: 0; transform: scale(1) translateY(-15vh); text-shadow: 0 0 0 transparent; }
+            100% { opacity: 0; transform: scale(1.2) translateY(-10vh); text-shadow: 0 0 0 transparent; }
         }
 
         .animate-goi {
-            animation: fadeUpGoi 1.0s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+            animation: fadeOutGoi 1.2s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
         }
 
-        /* ---------------- V7 Su Styles (Massive Impact) ---------------- */
+        /* ---------------- V9 Su Styles (Massive Impact) ---------------- */
         .color-su {
             color: #FFFFFF;
-            text-shadow: 0 10px 20px #000, 0 0 40px #00aaff, 0 0 80px #fff;
+            text-shadow: 0 10px 30px #000, 0 0 50px #00aaff, 0 0 100px #fff;
         }
 
         @keyframes impactSu {
-            0% { opacity: 1; transform: scale(5); text-shadow: 0 0 150px #fff; }
-            15% { opacity: 1; transform: scale(2.5); text-shadow: 0 0 40px #00aaff; }
-            80% { opacity: 1; transform: scale(2.5); text-shadow: 0 0 40px #00aaff; }
-            100% { opacity: 0; transform: scale(2.4); text-shadow: 0 0 0 transparent; }
+            0% { opacity: 1; transform: scale(6); text-shadow: 0 0 150px #fff; }
+            15% { opacity: 1; transform: scale(2.8); text-shadow: 0 0 60px #00aaff; }
+            85% { opacity: 1; transform: scale(2.8); text-shadow: 0 0 60px #00aaff; }
+            100% { opacity: 0; transform: scale(2.7); text-shadow: 0 0 0 transparent; }
         }
 
         .animate-su {
@@ -109,12 +111,12 @@
 
         @keyframes whiteFlash {
             0% { background-color: #ffffff; }
-            15% { background-color: rgba(255, 255, 255, 0.2); }
+            15% { background-color: rgba(255, 255, 255, 0.3); }
             100% { background-color: #000000; }
         }
 
         .flash-white {
-            animation: whiteFlash 0.5s ease-out forwards;
+            animation: whiteFlash 0.6s ease-out forwards;
         }
 
         #debug-log {
@@ -128,6 +130,7 @@
             pointer-events: none;
             z-index: 1000;
             white-space: pre-wrap;
+            display: none; /* Set to block for debugging */
         }
 
         .hidden { display: none !important; }
@@ -136,7 +139,7 @@
 <body>
     <div id="start-container">
         <button id="start-button">開始（許可）</button>
-        <p class="guide-text">スマホを前に突き出すと喋ります</p>
+        <p class="guide-text">スマホを前に突き出すと判定されます</p>
     </div>
 
     <div id="result-display">
@@ -151,10 +154,15 @@
         const textElement = document.getElementById('text-element');
 
         let synth = null;
+        let isThrusting = false;
+        let thrustStartTime = 0;
         let hasTriggered = false;
-        let isCheckingPush = false;
-        let zBelowThresholdStart = 0;
         let wakeLock = null;
+
+        function logDebug(msg) {
+            const logEl = document.getElementById('debug-log');
+            if (logEl) logEl.textContent += msg + '\n';
+        }
 
         function speak(text, pitch, rate) {
             if (!synth) return;
@@ -170,26 +178,18 @@
             const isSu = type === 'su';
             textElement.textContent = isSu ? 'スー！' : 'ゴイ！';
             
-            // Trigger Visuals
+            // Visual Reset
             textElement.classList.remove('animate-goi', 'animate-su', 'color-goi', 'color-su');
             document.body.classList.remove('flash-white');
-            void textElement.offsetWidth; // Reflow to reset animation completely
+            void textElement.offsetWidth; // Reflow
             
             if (isSu) {
                 textElement.classList.add('animate-su', 'color-su');
-                document.body.classList.add('flash-white'); // Flash background on Su
-            } else {
-                textElement.classList.add('animate-goi', 'color-goi');
-                // No flash on Goi
-            }
-
-            // Trigger Audio with optimized parameters
-            if (isSu) {
-                // Su: Super high pitch (1.6)
+                document.body.classList.add('flash-white');
                 speak('スーーー！', 1.6, 0.8);
             } else {
-                // Goi: V8 modification (Clearer sound with slight pause 'っ')
-                speak('っゴイ！', 0.9, 1.3);
+                textElement.classList.add('animate-goi', 'color-goi');
+                speak('ゴイ！', 0.9, 1.3);
             }
         }
 
@@ -201,60 +201,51 @@
             const z = acc.z || 0;
             const gY = accG.y || 0;
 
-            // Z axis <= -20 logic (Firm push with 50ms filter)
+            // Z-axis threshold <= -20 for firm movement
             if (z <= -20) {
-                if (!hasTriggered) {
-                    if (!isCheckingPush) {
-                        isCheckingPush = true;
-                        zBelowThresholdStart = Date.now();
-                    } else if (Date.now() - zBelowThresholdStart > 50) {
-                        // Movement held for > 50ms, trigger!
+                if (!isThrusting) {
+                    isThrusting = true;
+                    thrustStartTime = Date.now();
+                    hasTriggered = false;
+                } else if (!hasTriggered) {
+                    const duration = Date.now() - thrustStartTime;
+                    // Su Condition: Held for more than 0.25s AND vertical angle (Y >= 6.5)
+                    if (duration >= 250 && gY >= 6.5) {
+                        showResult('su');
                         hasTriggered = true;
-                        isCheckingPush = false;
-                        
-                        // Angle check: upright (gY >= 7.0) -> Su, flat -> Goi
-                        if (gY >= 7.0) {
-                            showResult('su');
-                        } else {
-                            showResult('goi');
-                        }
                     }
                 }
             } else {
-                // Reset the 50ms timer if it bounces up before triggering
-                isCheckingPush = false;
-                
-                // Wait until movement fully subsides to prevent multiple rapid triggers
-                if (z > -5) {
-                    hasTriggered = false;
+                if (isThrusting) {
+                    const duration = Date.now() - thrustStartTime;
+                    if (!hasTriggered) {
+                        // Goi Condition: Flick ended within 0.2s AND horizontal angle (Y < 6.5)
+                        if (duration < 200 && gY < 6.5) {
+                            showResult('goi');
+                        }
+                    }
+                    
+                    // Reset if acceleration subsides (Z > -5)
+                    if (z > -5) {
+                        isThrusting = false;
+                        hasTriggered = false;
+                    }
                 }
             }
-        }
-
-        function logDebug(msg) {
-            const logEl = document.getElementById('debug-log');
-            if (logEl) logEl.textContent += msg + '\n';
         }
 
         function startApp() {
             startContainer.classList.add('hidden');
             window.addEventListener('devicemotion', handleMotion);
-            logDebug('App Started. Listening to devicemotion...');
         }
 
         startButton.addEventListener('click', () => {
-            logDebug('Start Button Clicked.');
-            
-            // 1. Speech Synthesis unlock
-            try {
-                synth = window.speechSynthesis;
-                const unlockUtter = new SpeechSynthesisUtterance('');
-                synth.speak(unlockUtter);
-            } catch(e) {
-                logDebug('Speech unlock error: ' + e.message);
-            }
+            // Unlock Speech API
+            synth = window.speechSynthesis;
+            const unlockUtter = new SpeechSynthesisUtterance('');
+            synth.speak(unlockUtter);
 
-            // 2. Audio Context unlock
+            // Unlock AudioContext
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -262,45 +253,24 @@
                 osc.connect(audioCtx.destination);
                 osc.start(0);
                 osc.stop(audioCtx.currentTime + 0.001);
-            } catch (e) {
-                logDebug('AudioContext unlock error: ' + e.message);
+            } catch (e) {}
+
+            // Wake Lock
+            if ('wakeLock' in navigator) {
+                navigator.wakeLock.request('screen').then(lock => {
+                    wakeLock = lock;
+                }).catch(() => {});
             }
 
-            // 3. DeviceMotion Permission
+            // Motion Permission
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-                logDebug('Requesting DeviceMotion permission...');
                 DeviceMotionEvent.requestPermission()
-                    .then(permissionState => {
-                        logDebug('Permission state: ' + permissionState);
-                        if (permissionState === 'granted') {
-                            startApp();
-                        } else {
-                            logDebug('Permission was NOT granted.');
-                        }
+                    .then(state => {
+                        if (state === 'granted') startApp();
                     })
-                    .catch(err => {
-                        logDebug('DeviceMotion error: ' + err.message);
-                    });
+                    .catch(console.error);
             } else {
-                logDebug('DeviceMotionEvent.requestPermission is not a function (Non-iOS).');
                 startApp();
-            }
-
-            // 4. Wake Lock request
-            try {
-                if ('wakeLock' in navigator) {
-                    navigator.wakeLock.request('screen').then(lock => {
-                        wakeLock = lock;
-                        logDebug('WakeLock acquired.');
-                        document.addEventListener('visibilitychange', async () => {
-                            if (wakeLock !== null && document.visibilityState === 'visible') {
-                                wakeLock = await navigator.wakeLock.request('screen');
-                            }
-                        });
-                    }).catch(err => logDebug('WakeLock error: ' + err.message));
-                }
-            } catch (e) {
-                logDebug('WakeLock API error: ' + e.message);
             }
         });
     </script>
