@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ゴイゴイスー App Final V9</title>
+    <title>ゴイゴイスー App V10 Refactor</title>
     <style>
         * {
             box-sizing: border-box;
@@ -69,15 +69,16 @@
 
         .goi-su-text {
             font-family: Impact, 'Arial Black', sans-serif;
-            font-size: 30vw;
+            font-size: 20vw;
             font-weight: 900;
             opacity: 0;
             pointer-events: none;
             white-space: nowrap;
             letter-spacing: 0.1em;
+            text-align: center;
         }
 
-        /* ---------------- V9 Goi Styles (Graceful FadeOut) ---------------- */
+        /* ---------------- V10 Goi Styles (Vertical Shake, Yellow, FadeOut) ---------------- */
         .color-goi {
             color: #FFFF00;
             text-shadow: 0 5px 15px #000, 0 0 30px #ff4d00;
@@ -85,14 +86,14 @@
 
         @keyframes fadeOutGoi {
             0% { opacity: 1; transform: scale(1.5) translateY(0); text-shadow: 0 0 50px #fff; }
-            100% { opacity: 0; transform: scale(1.2) translateY(-10vh); text-shadow: 0 0 0 transparent; }
+            100% { opacity: 0; transform: scale(1.2) translateY(-15vh); text-shadow: 0 0 0 transparent; }
         }
 
         .animate-goi {
-            animation: fadeOutGoi 1.2s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+            animation: fadeOutGoi 1.0s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
         }
 
-        /* ---------------- V9 Su Styles (Massive Impact) ---------------- */
+        /* ---------------- V10 Su Styles (Horizontal Swing, White, Impact) ---------------- */
         .color-su {
             color: #FFFFFF;
             text-shadow: 0 10px 30px #000, 0 0 50px #00aaff, 0 0 100px #fff;
@@ -100,9 +101,9 @@
 
         @keyframes impactSu {
             0% { opacity: 1; transform: scale(6); text-shadow: 0 0 150px #fff; }
-            15% { opacity: 1; transform: scale(2.8); text-shadow: 0 0 60px #00aaff; }
-            85% { opacity: 1; transform: scale(2.8); text-shadow: 0 0 60px #00aaff; }
-            100% { opacity: 0; transform: scale(2.7); text-shadow: 0 0 0 transparent; }
+            15% { opacity: 1; transform: scale(3.5); text-shadow: 0 0 60px #00aaff; }
+            85% { opacity: 1; transform: scale(3.5); text-shadow: 0 0 60px #00aaff; }
+            100% { opacity: 0; transform: scale(3.4); text-shadow: 0 0 0 transparent; }
         }
 
         .animate-su {
@@ -130,7 +131,7 @@
             pointer-events: none;
             z-index: 1000;
             white-space: pre-wrap;
-            display: none; /* Set to block for debugging */
+            display: none;
         }
 
         .hidden { display: none !important; }
@@ -139,7 +140,7 @@
 <body>
     <div id="start-container">
         <button id="start-button">開始（許可）</button>
-        <p class="guide-text">スマホを前に突き出すと判定されます</p>
+        <p class="guide-text">縦に振ると「ゴイ！」、横に振ると「スー！」</p>
     </div>
 
     <div id="result-display">
@@ -154,15 +155,9 @@
         const textElement = document.getElementById('text-element');
 
         let synth = null;
-        let isThrusting = false;
-        let thrustStartTime = 0;
-        let hasTriggered = false;
+        let lastTriggerTime = 0;
+        const COOLDOWN_MS = 500;
         let wakeLock = null;
-
-        function logDebug(msg) {
-            const logEl = document.getElementById('debug-log');
-            if (logEl) logEl.textContent += msg + '\n';
-        }
 
         function speak(text, pitch, rate) {
             if (!synth) return;
@@ -195,41 +190,24 @@
 
         function handleMotion(event) {
             const acc = event.acceleration;
-            const accG = event.accelerationIncludingGravity;
-            if (!acc || !accG) return;
+            if (!acc) return;
             
-            const z = acc.z || 0;
-            const gY = accG.y || 0;
+            const x = acc.x || 0;
+            const y = acc.y || 0;
+            const absX = Math.abs(x);
+            const absY = Math.abs(y);
+            const now = Date.now();
 
-            // Z-axis threshold <= -20 for firm movement
-            if (z <= -20) {
-                if (!isThrusting) {
-                    isThrusting = true;
-                    thrustStartTime = Date.now();
-                    hasTriggered = false;
-                } else if (!hasTriggered) {
-                    const duration = Date.now() - thrustStartTime;
-                    // Su Condition: Held for more than 0.25s AND vertical angle (Y >= 6.5)
-                    if (duration >= 250 && gY >= 6.5) {
-                        showResult('su');
-                        hasTriggered = true;
-                    }
-                }
-            } else {
-                if (isThrusting) {
-                    const duration = Date.now() - thrustStartTime;
-                    if (!hasTriggered) {
-                        // Goi Condition: Flick ended within 0.2s AND horizontal angle (Y < 6.5)
-                        if (duration < 200 && gY < 6.5) {
-                            showResult('goi');
-                        }
-                    }
-                    
-                    // Reset if acceleration subsides (Z > -5)
-                    if (z > -5) {
-                        isThrusting = false;
-                        hasTriggered = false;
-                    }
+            if (now - lastTriggerTime < COOLDOWN_MS) return;
+
+            // V10 Physics: Y-axis shake (Vertical) vs X-axis swing (Horizontal)
+            if (absY > 12 || absX > 12) {
+                if (absY > absX && absY > 12) {
+                    showResult('goi');
+                    lastTriggerTime = now;
+                } else if (absX >= absY && absX > 12) {
+                    showResult('su');
+                    lastTriggerTime = now;
                 }
             }
         }
@@ -240,12 +218,10 @@
         }
 
         startButton.addEventListener('click', () => {
-            // Unlock Speech API
             synth = window.speechSynthesis;
             const unlockUtter = new SpeechSynthesisUtterance('');
             synth.speak(unlockUtter);
 
-            // Unlock AudioContext
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -255,14 +231,12 @@
                 osc.stop(audioCtx.currentTime + 0.001);
             } catch (e) {}
 
-            // Wake Lock
             if ('wakeLock' in navigator) {
                 navigator.wakeLock.request('screen').then(lock => {
                     wakeLock = lock;
                 }).catch(() => {});
             }
 
-            // Motion Permission
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission()
                     .then(state => {
