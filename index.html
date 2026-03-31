@@ -134,6 +134,23 @@
         .color-gogoi { color: #FF5722; } /* Dark Orange for 5 Combo */
         .color-su { color: #00E5FF; font-style: italic; }
         .color-sue-jackpot { color: #FFFFFF; font-style: italic; } /* White text, Gold stroke */
+        .color-weak-su { color: #88888899; } /* Translucent Grey */
+        .color-ultimate { color: #FFD700; font-style: italic; }
+
+        .ultimate-text {
+            font-size: min(14vw, 90px) !important;
+            white-space: nowrap !important;
+        }
+
+        /* Ultimate Finish Stroke: Thick Black inside, Massive Red outside */
+        .double-stroke-red {
+            text-shadow: 
+                -1vw -1vw 0 #000,  1vw -1vw 0 #000, -1vw  1vw 0 #000,  1vw  1vw 0 #000,
+                 0   -1vw 0 #000,  0    1vw 0 #000, -1vw  0   0 #000,  1vw  0   0 #000,
+                -3vw -3vw 0 #e60000,  3vw -3vw 0 #e60000, -3vw  3vw 0 #e60000,  3vw  3vw 0 #e60000,
+                 0    -3vw 0 #e60000,  0     3vw 0 #e60000, -3vw  0   0 #e60000,  3vw  0   0 #e60000,
+                 4vw 4vw 0px rgba(0,0,0,0.5);
+        }
 
         /* Animations */
         @keyframes popGoi {
@@ -155,6 +172,15 @@
 
         .animate-su {
             animation: zoomSu 2.0s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+        }
+
+        @keyframes fallDown {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(50vh) rotate(20deg); opacity: 0; }
+        }
+
+        .animate-weak-su {
+            animation: fallDown 2.0s ease-in forwards;
         }
 
         @keyframes jackpotZoom {
@@ -188,6 +214,36 @@
             animation: goldFlash 1.5s ease-out forwards;
         }
 
+        /* Ultimate Rainbow Flash & Earthquake */
+        @keyframes flashRainbow {
+            0% { background-color: rgba(255, 0, 0, 0.7); }
+            16% { background-color: rgba(255, 165, 0, 0.7); }
+            33% { background-color: rgba(255, 255, 0, 0.7); }
+            50% { background-color: rgba(0, 255, 0, 0.7); }
+            66% { background-color: rgba(0, 255, 255, 0.7); }
+            83% { background-color: rgba(0, 0, 255, 0.7); }
+            100% { background-color: rgba(255, 0, 255, 0.7); }
+        }
+
+        .flash-rainbow::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 50;
+            mix-blend-mode: color-dodge;
+            animation: flashRainbow 0.15s linear infinite alternate;
+        }
+
+        @keyframes earthquake {
+            0% { transform: translate(-3vw, -3vh) rotate(-3deg); }
+            100% { transform: translate(3vw, 3vh) rotate(3deg); }
+        }
+
+        .earthquake-body {
+            animation: earthquake 0.1s linear 15 alternate;
+        }
+
         /* Particles */
         .star-particle {
             position: absolute;
@@ -213,7 +269,7 @@
         }
         @keyframes blastJackpot {
             0% { transform: translate(-50%, -50%) scale(1.0) rotate(0deg); opacity: 1; }
-            100% { transform: translate(calc(-50% + var(--tx)*2)), calc(-50% + var(--ty)*2))) scale(2.0) rotate(720deg); opacity: 0; }
+            100% { transform: translate(calc(-50% + var(--tx) * 2), calc(-50% + var(--ty) * 2)) scale(2.0) rotate(720deg); opacity: 0; }
         }
 
         .hidden { display: none !important; }
@@ -243,38 +299,60 @@
         // Combo Counters
         let goiCount = 0;
         let sueCount = 0;
+        
+        // Ultimate Finish Flag
+        let isGogoiActive = false;
+        let gogoiTimeoutId = null;
 
-        function speak(text, pitch, rate) {
+        function speak(text, pitch, rate, volume = 1.0) {
             if (!synth) return;
             synth.cancel(); 
             const utter = new SpeechSynthesisUtterance(text);
             utter.lang = 'ja-JP';
             utter.pitch = pitch;
             utter.rate = rate;
+            utter.volume = volume;
             synth.speak(utter);
         }
 
-        function createParticles(isJackpot = false) {
+        function createParticles(type = 'normal') {
             document.querySelectorAll('.star-particle, .star-particle-gold').forEach(el => el.remove());
-            const particleCount = isJackpot ? 15 : 8;
+            
+            let particleCount = 8;
+            let className = 'star-particle';
+            let colors = ['#FFEA00'];
+            
+            if (type === 'jackpot') {
+                particleCount = 15;
+                className = 'star-particle-gold';
+            } else if (type === 'ultimate') {
+                particleCount = 30;
+                className = 'star-particle-gold';
+                colors = ['#FFD700', '#FFEA00', '#FF0000', '#00E5FF', '#FF00FF'];
+            }
             
             for(let i = 0; i < particleCount; i++) {
                 const p = document.createElement('div');
-                p.className = isJackpot ? 'star-particle-gold' : 'star-particle';
+                p.className = className;
+                
+                if (type === 'ultimate') {
+                    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+                }
+                
                 document.body.appendChild(p);
                 
                 const angle = Math.random() * Math.PI * 2;
-                const velocity = 30 + Math.random() * 50;
+                const velocity = type === 'ultimate' ? (50 + Math.random() * 80) : (30 + Math.random() * 50);
                 p.style.setProperty('--tx', Math.cos(angle) * velocity + 'vw');
                 p.style.setProperty('--ty', Math.sin(angle) * velocity + 'vw');
                 
-                setTimeout(() => p.remove(), isJackpot ? 1500 : 600);
+                setTimeout(() => p.remove(), type === 'normal' ? 600 : 1500);
             }
         }
 
         function showResult(type) {
             // Visual Reset
-            textElement.classList.remove('animate-goi', 'animate-su', 'animate-jackpot', 'color-goi', 'color-su', 'color-gogoi', 'color-sue-jackpot', 'jackpot-text', 'double-stroke-gold', 'double-stroke');
+            textElement.classList.remove('animate-goi', 'animate-su', 'animate-jackpot', 'animate-weak-su', 'color-goi', 'color-su', 'color-gogoi', 'color-sue-jackpot', 'color-weak-su', 'jackpot-text', 'double-stroke-gold', 'double-stroke');
             document.body.classList.remove('shake-body', 'flash-gold');
             void textElement.offsetWidth; // Force Reflow
             
@@ -282,13 +360,28 @@
             textElement.classList.add('double-stroke');
 
             if (type === 'su') {
+                // 10% Rare "Weak Su" Failure
+                if (Math.random() < 0.1) {
+                    sueCount = 0;
+                    textElement.innerHTML = 'ｽｰ...';
+                    textElement.classList.remove('double-stroke');
+                    textElement.classList.add('animate-weak-su', 'color-weak-su');
+                    textElement.style.fontSize = '5vw';
+                    
+                    speak('ｽｰ', 0.4, 0.3, 0.5);
+                    return;
+                }
+                
+                // Reset font size if coming from Weak Su
+                textElement.style.fontSize = '';
+                
                 goiCount = 0;
                 sueCount++;
 
                 if (sueCount === 3) {
                     // Jackpot Su
                     sueCount = 0;
-                    createParticles(true);
+                    createParticles('jackpot');
                     
                     // Force a break in the text if it's too long
                     textElement.innerHTML = 'スーを<br>差し上げます！';
@@ -301,20 +394,37 @@
                     speak('スーをさしあげます！', 1.8, 0.9);
                 } else {
                     // Normal Su
-                    createParticles(false);
+                    createParticles('normal');
                     textElement.innerHTML = 'スー！';
                     textElement.classList.add('animate-su', 'color-su');
                     speak('スーーー！', 1.6, 0.8);
                 }
 
             } else if (type === 'goi') {
+                // Reset flag if we miss the timing or do something else
+                if (isGogoiActive) {
+                    isGogoiActive = false;
+                    if (gogoiTimeoutId) clearTimeout(gogoiTimeoutId);
+                }
+                
+                // Reset font size
+                textElement.style.fontSize = '';
+                
                 sueCount = 0;
                 goiCount++;
 
                 if (goiCount === 5) {
                     // Combo Goi
                     goiCount = 0;
-                    createParticles(false);
+                    
+                    // Arm the ultimate finish flag
+                    isGogoiActive = true;
+                    if (gogoiTimeoutId) clearTimeout(gogoiTimeoutId);
+                    gogoiTimeoutId = setTimeout(() => {
+                        isGogoiActive = false;
+                    }, 4000); // 4 seconds to execute the Su finish
+                    
+                    createParticles('normal');
                     textElement.innerHTML = 'ゴゴイ！';
                     textElement.classList.add('animate-goi', 'color-gogoi');
                     document.body.classList.add('shake-body');
@@ -323,7 +433,7 @@
                     speak('ゴゴイ！', 1.1, 1.4);
                 } else {
                     // Normal Goi
-                    createParticles(false);
+                    createParticles('normal');
                     textElement.innerHTML = 'ゴイ！';
                     textElement.classList.add('animate-goi', 'color-goi');
                     document.body.classList.add('shake-body');
@@ -347,10 +457,10 @@
             if (now - lastTriggerTime < COOLDOWN_MS) return;
 
             if (absY > THRESHOLD || absX > THRESHOLD) {
-                if (absY > absX) {
+                if (absY > absX * RATIO) {
                     showResult('goi');
                     lastTriggerTime = now;
-                } else if (absX > absY) {
+                } else if (absX > absY * RATIO) {
                     showResult('su');
                     lastTriggerTime = now;
                 }
