@@ -116,13 +116,14 @@
         const startContainer = document.getElementById('start-container');
         const textElement = document.getElementById('text-element');
 
-        const synth = window.speechSynthesis;
+        let synth = null;
         let isThrusting = false;
         let thrustStartTime = 0;
         let hasTriggered = false;
         let wakeLock = null;
 
         function speak(text, pitch, rate) {
+            if (!synth) return;
             synth.cancel();
             const utter = new SpeechSynthesisUtterance(text);
             utter.lang = 'ja-JP';
@@ -188,6 +189,9 @@
         }
 
         async function requestPermissions() {
+            // Initialize Speech Synthesis explicitly on user interaction
+            synth = window.speechSynthesis;
+
             // 1. Silent utter to unlock Speech Synthesis
             const unlockUtter = new SpeechSynthesisUtterance('');
             synth.speak(unlockUtter);
