@@ -98,6 +98,19 @@
             animation: whiteFlash 0.5s ease-out forwards;
         }
 
+        #debug-log {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            color: #ffaa00;
+            font-size: 10px;
+            font-family: monospace;
+            pointer-events: none;
+            z-index: 1000;
+            white-space: pre-wrap;
+        }
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -110,6 +123,8 @@
     <div id="result-display">
         <div id="text-element" class="goi-su-text"></div>
     </div>
+
+    <div id="debug-log"></div>
 
     <script>
         const startButton = document.getElementById('start-button');
@@ -188,66 +203,78 @@
             }
         }
 
-        async function requestPermissions() {
-            // Initialize Speech Synthesis explicitly on user interaction
-            synth = window.speechSynthesis;
-
-            // 1. Silent utter to unlock Speech Synthesis
-            const unlockUtter = new SpeechSynthesisUtterance('');
-            synth.speak(unlockUtter);
-
-            // 2. Silent audio context to unlock Audio completely
-            try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                if (audioCtx.state === 'suspended') {
-                    await audioCtx.resume();
-                }
-                const osc = audioCtx.createOscillator();
-                osc.connect(audioCtx.destination);
-                osc.start(0);
-                osc.stop(audioCtx.currentTime + 0.001);
-            } catch (e) {
-                console.warn('AudioContext unlock failed:', e);
-            }
-
-            // 3. Request Wake Lock to prevent screen sleep
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    document.addEventListener('visibilitychange', async () => {
-                        if (wakeLock !== null && document.visibilityState === 'visible') {
-                            wakeLock = await navigator.wakeLock.request('screen');
-                        }
-                    });
-                }
-            } catch (e) {
-                console.warn('Wake Lock request failed:', e);
-            }
-
-            // 4. Request Motion Permission
-            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-                try {
-                    const state = await DeviceMotionEvent.requestPermission();
-                    if (state === 'granted') {
-                        startApp();
-                    } else {
-                        alert('センサーの許可が必要です');
-                    }
-                } catch (e) {
-                    console.error(e);
-                    alert('エラーが発生しました');
-                }
-            } else {
-                startApp();
-            }
+        function logDebug(msg) {
+            const logEl = document.getElementById('debug-log');
+            if (logEl) logEl.textContent += msg + '\n';
         }
 
         function startApp() {
             startContainer.classList.add('hidden');
             window.addEventListener('devicemotion', handleMotion);
+            logDebug('App Started. Listening to devicemotion...');
         }
 
-        startButton.addEventListener('click', requestPermissions);
+        startButton.addEventListener('click', () => {
+            logDebug('Start Button Clicked.');
+            
+            // 1. Speech Synthesis unlock
+            try {
+                synth = window.speechSynthesis;
+                const unlockUtter = new SpeechSynthesisUtterance('');
+                synth.speak(unlockUtter);
+            } catch(e) {
+                logDebug('Speech unlock error: ' + e.message);
+            }
+
+            // 2. Audio Context unlock
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                osc.connect(audioCtx.destination);
+                osc.start(0);
+                osc.stop(audioCtx.currentTime + 0.001);
+            } catch (e) {
+                logDebug('AudioContext unlock error: ' + e.message);
+            }
+
+            // 3. DeviceMotion Permission
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                logDebug('Requesting DeviceMotion permission...');
+                DeviceMotionEvent.requestPermission()
+                    .then(permissionState => {
+                        logDebug('Permission state: ' + permissionState);
+                        if (permissionState === 'granted') {
+                            startApp();
+                        } else {
+                            logDebug('Permission was NOT granted.');
+                        }
+                    })
+                    .catch(err => {
+                        logDebug('DeviceMotion error: ' + err.message);
+                    });
+            } else {
+                logDebug('DeviceMotionEvent.requestPermission is not a function (Non-iOS).');
+                startApp();
+            }
+
+            // 4. Wake Lock request
+            try {
+                if ('wakeLock' in navigator) {
+                    navigator.wakeLock.request('screen').then(lock => {
+                        wakeLock = lock;
+                        logDebug('WakeLock acquired.');
+                        document.addEventListener('visibilitychange', async () => {
+                            if (wakeLock !== null && document.visibilityState === 'visible') {
+                                wakeLock = await navigator.wakeLock.request('screen');
+                            }
+                        });
+                    }).catch(err => logDebug('WakeLock error: ' + err.message));
+                }
+            } catch (e) {
+                logDebug('WakeLock API error: ' + e.message);
+            }
+        });
     </script>
 </body>
 </html>
