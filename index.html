@@ -58,56 +58,57 @@
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
             display: flex;
-            justify-content: center;
-            align-items: center;
+            align-items: center; /* Vertical Center */
+            justify-content: center; /* Horizontal Center */
+            overflow: hidden; /* Prevent Overflow */
             pointer-events: none;
             z-index: 100;
         }
 
         .goi-su-text {
-            font-family: Impact, 'Arial Black', sans-serif;
-            font-size: 20vw;
+            font-family: sans-serif, Impact, 'Arial Black';
+            font-size: 18vw; /* Safe size for mobile width */
             font-weight: 900;
             opacity: 0;
             pointer-events: none;
             white-space: nowrap;
-            letter-spacing: 0.1em;
+            letter-spacing: -0.5rem; /* Compressed for visibility */
             text-align: center;
         }
 
-        /* ---------------- V10 Goi Styles (Vertical Shake, Yellow, FadeOut) ---------------- */
+        /* ---------------- V11 Goi Styles (Vertical Shake) ---------------- */
         .color-goi {
             color: #FFFF00;
             text-shadow: 0 5px 15px #000, 0 0 30px #ff4d00;
         }
 
         @keyframes fadeOutGoi {
-            0% { opacity: 1; transform: scale(1.5) translateY(0); text-shadow: 0 0 50px #fff; }
-            100% { opacity: 0; transform: scale(1.2) translateY(-15vh); text-shadow: 0 0 0 transparent; }
+            0% { opacity: 1; transform: scale(1.1) translateY(0); text-shadow: 0 0 50px #fff; }
+            100% { opacity: 0; transform: scale(1.0) translateY(-10vh); text-shadow: 0 0 0 transparent; }
         }
 
         .animate-goi {
             animation: fadeOutGoi 1.0s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
         }
 
-        /* ---------------- V10 Su Styles (Horizontal Swing, White, Impact) ---------------- */
+        /* ---------------- V11 Su Styles (Impact but Safe Scale) ---------------- */
         .color-su {
             color: #FFFFFF;
-            text-shadow: 0 10px 30px #000, 0 0 50px #00aaff, 0 0 100px #fff;
+            text-shadow: 0 0 20px #00aaff, 0 0 40px #ffffff, 0 0 60px #00aaff;
         }
 
         @keyframes impactSu {
-            0% { opacity: 1; transform: scale(6); text-shadow: 0 0 150px #fff; }
-            15% { opacity: 1; transform: scale(3.5); text-shadow: 0 0 60px #00aaff; }
-            85% { opacity: 1; transform: scale(3.5); text-shadow: 0 0 60px #00aaff; }
-            100% { opacity: 0; transform: scale(3.4); text-shadow: 0 0 0 transparent; }
+            0% { opacity: 1; transform: scale(1.5); text-shadow: 0 0 100px #fff; }
+            15% { opacity: 1; transform: scale(1.2); text-shadow: 0 0 40px #00aaff; }
+            85% { opacity: 1; transform: scale(1.2); text-shadow: 0 0 40px #00aaff; }
+            100% { opacity: 0; transform: scale(1.15); text-shadow: 0 0 0 transparent; }
         }
 
         .animate-su {
-            animation: impactSu 2.0s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+            animation: impactSu 1.5s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
         }
 
         @keyframes whiteFlash {
