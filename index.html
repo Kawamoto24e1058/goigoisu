@@ -297,8 +297,7 @@
         let synth = null;
         let lastTriggerTime = 0;
         const COOLDOWN_MS = 200; // Professional Speed
-        const THRESHOLD = 12;    // V21 Relaxed Threshold for less fatigue
-        const RATIO = 3.5;       // V21 Ultra-Strict Ratio to prevent diagonals
+        const THRESHOLD = 15;    // V23 Ergonomic Threshold
         let wakeLock = null;
 
         // Combo Counters
@@ -473,17 +472,13 @@
 
             if (now - lastTriggerTime < COOLDOWN_MS) return;
 
-            // Strict V21 Physics: 3.5x Dominance + Relaxed 12G Threshold
-            // Added Z-Axis Filter to ignore 'punches' and complex noisy shakes
-            const z = acc.z || 0;
-            const absZ = Math.abs(z);
-            
-            // Y-Axis: Minimum 12G (Chop motion)
-            // X-Axis: Minimum 12G (Swing motion)
-            if (absY > THRESHOLD && absY > absX * RATIO && absY > absZ * 2.0) {
+            // V23 Ergonomic Physics: Asymmetric Dominance (Human arm curve compensation)
+            // Y-Axis (Goi): 15G Threshold, 1.8x stricter dominance
+            // X-Axis (Su) : 15G Threshold, 1.2x relaxed dominance (wrist rotation forgiveness)
+            if (absY > THRESHOLD && absY > absX * 1.8) {
                 showResult('goi');
                 lastTriggerTime = now;
-            } else if (absX > THRESHOLD && absX > absY * RATIO && absX > absZ * 2.0) {
+            } else if (absX > THRESHOLD && absX > absY * 1.2) {
                 showResult('su');
                 lastTriggerTime = now;
             }
