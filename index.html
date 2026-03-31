@@ -328,21 +328,22 @@
         function speak(text, pitch, rate, volume = 1.0) {
             if (!synth) return;
             
-            // Speech API Freeze Mitigation
+            // Speech API Freeze Mitigation (iOS specific bug fix)
             try {
-                synth.pause();
-                synth.resume();
                 synth.cancel(); 
             } catch(e) {
                 console.warn('Speech cancel error:', e);
             }
             
-            const utter = new SpeechSynthesisUtterance(text);
-            utter.lang = 'ja-JP';
-            utter.pitch = pitch;
-            utter.rate = rate;
-            utter.volume = volume;
-            synth.speak(utter);
+            // Delay before speaking to avoid cancel() lock
+            setTimeout(() => {
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.lang = 'ja-JP';
+                utter.pitch = pitch;
+                utter.rate = rate;
+                utter.volume = volume;
+                synth.speak(utter);
+            }, 50);
         }
 
         function createParticles(type = 'normal') {
@@ -431,11 +432,9 @@
                 }
 
             } else if (type === 'goi') {
-                // Reset flag if we miss the timing or do something else
-                if (isGogoiActive) {
-                    isGogoiActive = false;
-                    if (gogoiTimeoutId) clearTimeout(gogoiTimeoutId);
-                }
+                // Noise Immunity for Ultimate Finisher!
+                // If we are waiting for the Final 'Su', perfectly ignore ALL vertical shakings.
+                if (isGogoiActive) return;
                 
                 // Reset font size
                 textElement.style.fontSize = '';
@@ -452,7 +451,7 @@
                     if (gogoiTimeoutId) clearTimeout(gogoiTimeoutId);
                     gogoiTimeoutId = setTimeout(() => {
                         isGogoiActive = false;
-                    }, 4000); // 4 seconds to execute the Su finish
+                    }, 3000); // 3 seconds to execute the Su finish
                     
                     createParticles('normal');
                     textElement.innerHTML = 'ゴゴイ！';
@@ -507,8 +506,8 @@
 
         startButton.addEventListener('click', () => {
             synth = window.speechSynthesis;
-            const unlockUtter = new SpeechSynthesisUtterance('');
-            synth.speak(unlockUtter);
+            let u = new SpeechSynthesisUtterance('');
+            synth.speak(u);
 
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
