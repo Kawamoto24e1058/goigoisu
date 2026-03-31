@@ -75,40 +75,36 @@
             white-space: nowrap;
         }
 
-        /* ---------------- V6 Goi Styles ---------------- */
+        /* ---------------- V7 Goi Styles (Slide up fade) ---------------- */
         .color-goi {
             color: #FFFF00;
             text-shadow: 0 5px 15px #000, 0 0 30px #ff4d00;
         }
 
-        @keyframes explodeGoi {
-            0% { opacity: 1; transform: scale(2); text-shadow: 0 0 100px #fff; }
-            50% { opacity: 1; transform: scale(1.5); text-shadow: 0 0 20px #FFFF00; }
-            100% { opacity: 0; transform: scale(1); text-shadow: 0 0 0 transparent; }
+        @keyframes fadeUpGoi {
+            0% { opacity: 1; transform: scale(1.5) translateY(0); text-shadow: 0 0 50px #fff; }
+            100% { opacity: 0; transform: scale(1) translateY(-15vh); text-shadow: 0 0 0 transparent; }
         }
 
         .animate-goi {
-            animation: explodeGoi 0.5s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+            animation: fadeUpGoi 1.0s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
         }
 
-        /* ---------------- V6 Su Styles ---------------- */
+        /* ---------------- V7 Su Styles (Massive Impact) ---------------- */
         .color-su {
-            color: #E6F0FF; /* Slight bluish white */
-            text-shadow: 0 0 20px #ffffff, 0 0 40px #00aaff;
+            color: #FFFFFF;
+            text-shadow: 0 10px 20px #000, 0 0 40px #00aaff, 0 0 80px #fff;
         }
 
-        @keyframes trembleFadeUpSu {
-            0% { opacity: 1; transform: scale(1.2) translateY(0) rotate(0deg); text-shadow: 0 0 100px #fff; }
-            10% { transform: scale(1.1) translateY(-2vh) rotate(2deg); }
-            20% { transform: scale(1.05) translateY(-4vh) rotate(-2deg); }
-            30% { transform: scale(1.0) translateY(-6vh) rotate(1deg); }
-            40% { transform: scale(0.95) translateY(-8vh) rotate(-1deg); }
-            50% { opacity: 0.8; transform: scale(0.9) translateY(-10vh) rotate(1deg); }
-            100% { opacity: 0; transform: scale(0.8) translateY(-20vh) rotate(0deg); text-shadow: 0 0 0 transparent; }
+        @keyframes impactSu {
+            0% { opacity: 1; transform: scale(5); text-shadow: 0 0 150px #fff; }
+            15% { opacity: 1; transform: scale(2.5); text-shadow: 0 0 40px #00aaff; }
+            80% { opacity: 1; transform: scale(2.5); text-shadow: 0 0 40px #00aaff; }
+            100% { opacity: 0; transform: scale(2.4); text-shadow: 0 0 0 transparent; }
         }
 
         .animate-su {
-            animation: trembleFadeUpSu 2.0s linear forwards;
+            animation: impactSu 2.0s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
         }
 
         @keyframes whiteFlash {
@@ -156,6 +152,8 @@
 
         let synth = null;
         let hasTriggered = false;
+        let isCheckingPush = false;
+        let zBelowThresholdStart = 0;
         let wakeLock = null;
 
         function speak(text, pitch, rate) {
@@ -179,18 +177,19 @@
             
             if (isSu) {
                 textElement.classList.add('animate-su', 'color-su');
+                document.body.classList.add('flash-white'); // Flash background on Su
             } else {
                 textElement.classList.add('animate-goi', 'color-goi');
-                document.body.classList.add('flash-white'); // Flash background only on Goi
+                // No flash on Goi
             }
 
             // Trigger Audio with optimized parameters
             if (isSu) {
-                // Su: High pitch (1.4), slow rate (0.8)
-                speak('スーーー！', 1.4, 0.8);
+                // Su: Super high pitch (1.6)
+                speak('スーーー！', 1.6, 0.8);
             } else {
-                // Goi: Low pitch (0.8), fast rate (1.8)
-                speak('ゴイ！', 0.8, 1.8);
+                // Goi: V8 modification (Clearer sound with slight pause 'っ')
+                speak('っゴイ！', 0.9, 1.3);
             }
         }
 
@@ -202,22 +201,33 @@
             const z = acc.z || 0;
             const gY = accG.y || 0;
 
-            // Z axis < -15 logic (Instant trigger)
-            if (z < -15) {
+            // Z axis <= -20 logic (Firm push with 50ms filter)
+            if (z <= -20) {
                 if (!hasTriggered) {
-                    hasTriggered = true;
-                    
-                    // Angle check: If device is upright (gY >= 6.5), "Su!", else "Goi!"
-                    if (gY >= 6.5) {
-                        showResult('su');
-                    } else {
-                        showResult('goi');
+                    if (!isCheckingPush) {
+                        isCheckingPush = true;
+                        zBelowThresholdStart = Date.now();
+                    } else if (Date.now() - zBelowThresholdStart > 50) {
+                        // Movement held for > 50ms, trigger!
+                        hasTriggered = true;
+                        isCheckingPush = false;
+                        
+                        // Angle check: upright (gY >= 7.0) -> Su, flat -> Goi
+                        if (gY >= 7.0) {
+                            showResult('su');
+                        } else {
+                            showResult('goi');
+                        }
                     }
                 }
-            } 
-            // Wait until movement fully subsides to prevent multiple rapid triggers
-            else if (z > -5) {
-                hasTriggered = false;
+            } else {
+                // Reset the 50ms timer if it bounces up before triggering
+                isCheckingPush = false;
+                
+                // Wait until movement fully subsides to prevent multiple rapid triggers
+                if (z > -5) {
+                    hasTriggered = false;
+                }
             }
         }
 
