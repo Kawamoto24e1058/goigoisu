@@ -70,22 +70,45 @@
         .goi-su-text {
             font-size: 35vw;
             font-weight: 900;
-            color: #ffffff;
             opacity: 0;
-            transform: scale(0.1);
             pointer-events: none;
-            text-shadow: 0 0 40px rgba(255, 255, 255, 1);
             white-space: nowrap;
         }
 
-        @keyframes heavyZoomIn {
-            0% { opacity: 0; transform: scale(4); }
-            15% { opacity: 1; transform: scale(1); text-shadow: 0 0 100px #fff; }
-            100% { opacity: 0; transform: scale(1.1); text-shadow: 0 0 20px #fff; }
+        /* ---------------- V6 Goi Styles ---------------- */
+        .color-goi {
+            color: #FFFF00;
+            text-shadow: 0 5px 15px #000, 0 0 30px #ff4d00;
         }
 
-        .animate-zoom {
-            animation: heavyZoomIn 0.8s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+        @keyframes explodeGoi {
+            0% { opacity: 1; transform: scale(2); text-shadow: 0 0 100px #fff; }
+            50% { opacity: 1; transform: scale(1.5); text-shadow: 0 0 20px #FFFF00; }
+            100% { opacity: 0; transform: scale(1); text-shadow: 0 0 0 transparent; }
+        }
+
+        .animate-goi {
+            animation: explodeGoi 0.5s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+        }
+
+        /* ---------------- V6 Su Styles ---------------- */
+        .color-su {
+            color: #E6F0FF; /* Slight bluish white */
+            text-shadow: 0 0 20px #ffffff, 0 0 40px #00aaff;
+        }
+
+        @keyframes trembleFadeUpSu {
+            0% { opacity: 1; transform: scale(1.2) translateY(0) rotate(0deg); text-shadow: 0 0 100px #fff; }
+            10% { transform: scale(1.1) translateY(-2vh) rotate(2deg); }
+            20% { transform: scale(1.05) translateY(-4vh) rotate(-2deg); }
+            30% { transform: scale(1.0) translateY(-6vh) rotate(1deg); }
+            40% { transform: scale(0.95) translateY(-8vh) rotate(-1deg); }
+            50% { opacity: 0.8; transform: scale(0.9) translateY(-10vh) rotate(1deg); }
+            100% { opacity: 0; transform: scale(0.8) translateY(-20vh) rotate(0deg); text-shadow: 0 0 0 transparent; }
+        }
+
+        .animate-su {
+            animation: trembleFadeUpSu 2.0s linear forwards;
         }
 
         @keyframes whiteFlash {
@@ -132,8 +155,6 @@
         const textElement = document.getElementById('text-element');
 
         let synth = null;
-        let isThrusting = false;
-        let thrustStartTime = 0;
         let hasTriggered = false;
         let wakeLock = null;
 
@@ -152,11 +173,16 @@
             textElement.textContent = isSu ? 'スー！' : 'ゴイ！';
             
             // Trigger Visuals
-            textElement.classList.remove('animate-zoom');
+            textElement.classList.remove('animate-goi', 'animate-su', 'color-goi', 'color-su');
             document.body.classList.remove('flash-white');
-            void textElement.offsetWidth; // Reflow
-            textElement.classList.add('animate-zoom');
-            document.body.classList.add('flash-white');
+            void textElement.offsetWidth; // Reflow to reset animation completely
+            
+            if (isSu) {
+                textElement.classList.add('animate-su', 'color-su');
+            } else {
+                textElement.classList.add('animate-goi', 'color-goi');
+                document.body.classList.add('flash-white'); // Flash background only on Goi
+            }
 
             // Trigger Audio with optimized parameters
             if (isSu) {
@@ -170,36 +196,28 @@
 
         function handleMotion(event) {
             const acc = event.acceleration;
-            if (!acc) return;
+            const accG = event.accelerationIncludingGravity;
+            if (!acc || !accG) return;
+            
             const z = acc.z || 0;
+            const gY = accG.y || 0;
 
-            // Z axis < -15 logic
+            // Z axis < -15 logic (Instant trigger)
             if (z < -15) {
-                if (!isThrusting) {
-                    isThrusting = true;
-                    thrustStartTime = Date.now();
-                    hasTriggered = false;
-                } else if (!hasTriggered) {
-                    const duration = Date.now() - thrustStartTime;
-                    if (duration >= 300) {
+                if (!hasTriggered) {
+                    hasTriggered = true;
+                    
+                    // Angle check: If device is upright (gY >= 6.5), "Su!", else "Goi!"
+                    if (gY >= 6.5) {
                         showResult('su');
-                        hasTriggered = true;
-                    }
-                }
-            } else if (z > -10) {
-                if (isThrusting && !hasTriggered) {
-                    const duration = Date.now() - thrustStartTime;
-                    if (duration <= 250) {
+                    } else {
                         showResult('goi');
-                        hasTriggered = true;
                     }
                 }
-                
-                // Allow resetting state when acceleration completely subsides (z > -5)
-                if (z > -5) {
-                    isThrusting = false;
-                    hasTriggered = false;
-                }
+            } 
+            // Wait until movement fully subsides to prevent multiple rapid triggers
+            else if (z > -5) {
+                hasTriggered = false;
             }
         }
 
